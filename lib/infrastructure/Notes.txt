@@ -1,0 +1,99 @@
+It's a shame I wrote this and wasn't able to use it.  Oh well, copying/pasting it here just in case:
+
+  /**
+   *
+   */
+  struct HttpRequest {
+      const char *method;         //
+      const char *path;           //
+      const char *version;        //
+
+      const int totalHeaders;     //
+      HttpHeader const *headers;  //
+
+      const char *body;           //
+  };
+  
+  /**
+   *
+   */
+  enum HttpMethod {
+    GET,
+    POST,
+    HEAD,
+    PUT,
+    PATCH,
+    DELETE
+  };
+
+  /**
+   *
+   */
+  struct HttpHeader {
+    public:
+      const String name;   //
+      const String value;  //
+  };
+
+  /**
+   *
+   */
+  struct HttpResponse {
+    public:
+      const char *version;        //
+      const int statusCode;       //
+      const char *statusText;     //
+
+      const int totalHeaders;     //
+      HttpHeader const *headers;  //
+
+      const char *body;           //
+  };
+
+    /**
+     *
+     */
+    void sendRequest(HttpRequest req) {
+      static const auto writeHeader = [this] (const String headerName, const String headerValue) {
+        client.write(headerName.c_str(), headerName.length());
+        client.write(": ", 2);
+        client.write(headerValue.c_str(), headerValue.length());
+        client.write("\r\n", 2);
+      };
+
+      WiFiClient client = getConnectedClient();
+
+      // First Line of HTTP Request: `_METHOD_ _PATH_ HTTP/_VERSION_\r\n`
+      client.write(req.method, strlen(req.method)); // Eclipse says there's a method that doesn't require the number of characters, but I don't see this method in the source code.
+      client.write(" ", 1);
+      client.write(req.path, strlen(req.path));
+      client.write(" ", 1);
+      client.write("HTTP/", 5);
+      client.write(req.version, strlen(req.version));
+      client.write("\r\n", 2);
+
+      // Headers: `_NAME_: _VALUE_\r\n`
+      bool hasContentLength = false;
+      for(int headerIndex = 0; headerIndex < req.totalHeaders; headerIndex++) {
+        HttpHeader header = req.headers[headerIndex];
+
+        writeHeader(header.name, header.value);
+
+        hasContentLength = hasContentLength || header.name.equalsIgnoreCase("Content-Length");
+      }
+
+      int bodyLength = strlen(req.body);
+
+      if(!hasContentLength && bodyLength) {
+        writeHeader("Content-Length", String(bodyLength, DEC));
+      }
+
+      // Body: `\r\n_BODY_`
+      client.write("\r\n", 2);
+
+      if(bodyLength) {
+        client.write(req.body, bodyLength);
+      }
+
+      client.flush();
+    }
